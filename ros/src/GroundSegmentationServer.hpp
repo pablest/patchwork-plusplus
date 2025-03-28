@@ -19,11 +19,17 @@ class GroundSegmentationServer : public rclcpp::Node {
   /// Register new frame
   void EstimateGround(const sensor_msgs::msg::PointCloud2::ConstSharedPtr &msg);
 
+  //my implementation 
+  void PublishFullClouds(const Eigen::VectorXi ground_indices,
+    const Eigen::VectorXi nonground_indices,
+    const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg);
+
   /// Stream the point clouds for visualization
   void PublishClouds(const Eigen::MatrixX3f &est_ground,
                                              const Eigen::MatrixX3f &est_nonground,
                                              const std_msgs::msg::Header header_msg);
  private:
+
 
   /// Data subscribers.
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_sub_;

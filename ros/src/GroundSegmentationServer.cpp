@@ -15,6 +15,9 @@
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <std_msgs/msg/string.hpp>
 
+// mios 
+#include <sensor_msgs/point_cloud2_iterator.hpp>
+#include <iostream>
 namespace patchworkpp_ros {
 
 using utils::EigenToPointCloud2;
@@ -78,12 +81,78 @@ void GroundSegmentationServer::EstimateGround(const sensor_msgs::msg::PointCloud
   Patchworkpp_->estimateGround(cloud);
   cloud_publisher_->publish(patchworkpp_ros::utils::EigenMatToPointCloud2(cloud, msg->header));
   // Get ground and nonground
+  /*
   Eigen::MatrixX3f ground     = Patchworkpp_->getGround();
   Eigen::MatrixX3f nonground  = Patchworkpp_->getNonground();
   double           time_taken = Patchworkpp_->getTimeTaken();
   PublishClouds(ground, nonground, msg->header);
+  */
+
+  //Para experimentos, junta los indices de ground y no ground
+  Eigen::VectorXi ground_indx     = Patchworkpp_->getGroundIndices();
+  Eigen::VectorXi non_ground_indx  = Patchworkpp_->getNongroundIndices();
+
+  // Create a new VectorXi with combined size
+  /*
+  Eigen::VectorXi merged_indx(ground_indx.size() + non_ground_indx.size());
+  // Copy values into the new vector
+  merged_indx << ground_indx, non_ground_indx;
+  PublishFullClouds(ground_indx, merged_indx, msg);
+  */
+  PublishFullClouds(ground_indx, non_ground_indx, msg);
+
+}
+void GroundSegmentationServer::PublishFullClouds(
+  const Eigen::VectorXi ground_indices,
+  const Eigen::VectorXi nonground_indices,
+  const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) {
+
+  //generate non_ground_output by memcpy the original messages with the non_ground index
+  sensor_msgs::msg::PointCloud2 non_ground_output;
+  non_ground_output.header = msg->header;
+  non_ground_output.height = 1;
+  non_ground_output.width = nonground_indices.size();
+  non_ground_output.is_bigendian = msg->is_bigendian;
+  non_ground_output.point_step = msg->point_step;
+  non_ground_output.row_step = non_ground_output.point_step * non_ground_output.width;
+  non_ground_output.fields = msg->fields;
+  non_ground_output.is_dense = msg->is_dense;
+  non_ground_output.data.resize(non_ground_output.row_step);
+  
+  for (size_t i = 0; i < nonground_indices.size(); ++i) {
+      int idx = nonground_indices[i];
+      if (idx < 0 || idx >= static_cast<int>(msg->width * msg->height)) std::cout << "Ground Indices:" << std::endl;
+      std::memcpy(&non_ground_output.data[i * non_ground_output.point_step], &msg->data[idx * msg->point_step], msg->point_step);
+  }
+
+
+  //generate ground_output by memcpy the original messages with the non_ground index
+  sensor_msgs::msg::PointCloud2 ground_output;
+  ground_output.header = msg->header;
+  ground_output.height = 1;
+  ground_output.width = nonground_indices.size();
+  ground_output.is_bigendian = msg->is_bigendian;
+  ground_output.point_step = msg->point_step;
+  ground_output.row_step = ground_output.point_step * ground_output.width;
+  ground_output.fields = msg->fields;
+  ground_output.is_dense = msg->is_dense;
+  ground_output.data.resize(ground_output.row_step);
+  
+  for (size_t i = 0; i < ground_indices.size(); ++i) {
+      int idx = ground_indices[i];
+      if (idx < 0 || idx >= static_cast<int>(msg->width * msg->height)) std::cout << "Ground Indices:" << std::endl;
+      std::memcpy(&ground_output.data[i * ground_output.point_step], &msg->data[idx * msg->point_step], msg->point_step);
+  }
+
+
+  // Publish the filtered point clouds
+  nonground_publisher_->publish(non_ground_output);
+  ground_publisher_->publish(ground_output);
 }
 
+
+
+/*
 void GroundSegmentationServer::PublishClouds(const Eigen::MatrixX3f &est_ground,
                                              const Eigen::MatrixX3f &est_nonground,
                                              const std_msgs::msg::Header header_msg) {
@@ -93,6 +162,7 @@ void GroundSegmentationServer::PublishClouds(const Eigen::MatrixX3f &est_ground,
   ground_publisher_->publish(std::move(patchworkpp_ros::utils::EigenMatToPointCloud2(est_ground, header)));
   nonground_publisher_->publish(std::move(patchworkpp_ros::utils::EigenMatToPointCloud2(est_nonground, header)));
 }
+  */
 }  // namespace patchworkpp_ros
 
 #include "rclcpp_components/register_node_macro.hpp"

@@ -13,6 +13,7 @@
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <sensor_msgs/point_cloud2_iterator.hpp>
 
+
 namespace patchworkpp_ros::utils {
 
 using PointCloud2 = sensor_msgs::msg::PointCloud2;
